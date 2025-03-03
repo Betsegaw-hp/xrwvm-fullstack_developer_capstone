@@ -18,6 +18,13 @@ const Reviews = require('./review');
 
 const Dealerships = require('./dealership');
 
+class HttpError extends Error {
+    constructor(status, message) {
+        super(message);
+        this.status = status;
+    }
+}
+
 try {
   Reviews.deleteMany({}).then(()=>{
     Reviews.insertMany(reviews_data['reviews']);
@@ -27,9 +34,9 @@ try {
   });
   
 } catch (error) {
-  res.status(500).json({ error: 'Error fetching documents' });
+    console.error(error);
+    throw new HttpError(500, 'Internal Server Error');
 }
-
 
 // Express route to home
 app.get('/', async (req, res) => {
@@ -42,6 +49,7 @@ app.get('/fetchReviews', async (req, res) => {
     const documents = await Reviews.find();
     res.json(documents);
   } catch (error) {
+    console.error(error);
     res.status(500).json({ error: 'Error fetching documents' });
   }
 });
@@ -52,6 +60,7 @@ app.get('/fetchReviews/dealer/:id', async (req, res) => {
     const documents = await Reviews.find({dealership: req.params.id});
     res.json(documents);
   } catch (error) {
+    console.error(error);
     res.status(500).json({ error: 'Error fetching documents' });
   }
 });
@@ -62,6 +71,7 @@ app.get('/fetchDealers', async (req, res) => {
         const docs = await Dealerships.find();
         res.json(docs);
     } catch(error) {
+    	console.error(error);
         res.status(500).json({ error: 'Error fetching documents' });
     }
 });
@@ -72,6 +82,7 @@ app.get('/fetchDealers/:state', async (req, res) => {
         const docs = await Dealerships.find({ state: req.params.state });
         res.json(docs);
     } catch (error) {
+        console.error(error);
         res.status(500).json({ error: 'Error fetching documents' });
     }
 });
@@ -90,7 +101,7 @@ app.get('/fetchDealer/:id', async (req, res) => {
 
 //Express route to insert review
 app.post('/insert_review', express.raw({ type: '*/*' }), async (req, res) => {
-  data = JSON.parse(req.body);
+  const data = JSON.parse(req.body);
   const documents = await Reviews.find().sort( { id: -1 } )
   let new_id = documents[0]['id']+1
 
@@ -110,9 +121,18 @@ app.post('/insert_review', express.raw({ type: '*/*' }), async (req, res) => {
     const savedReview = await review.save();
     res.json(savedReview);
   } catch (error) {
-		console.log(error);
+	console.error(error);
     res.status(500).json({ error: 'Error inserting review' });
   }
+});
+
+// error handler middleware
+app.use((err, req, res, next) => {
+    if (err instanceof HttpError) {
+        res.status(err.status).send(err.message);
+    } else {
+        res.status(500).send('Something went wrong!');
+    }
 });
 
 // Start the Express server
